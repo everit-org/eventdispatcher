@@ -75,15 +75,15 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
      */
     @Override
     public void addListener(LK listenerKey, L listener) {
-        doReplaysForListener(listenerKey, listener);
         listeners.put(listenerKey, listener);
+        doReplaysForListener(listenerKey, listener);
     }
 
     /**
      * Calling a listener with an event. In case there is any exception or a timeout the listener will be removed from
      * the listeners collection and no more events will be passed.
      * 
-     * @param reference
+     * @param listenerKey
      *            The reference of the listener OSGi service.
      * @param listener
      *            The listener object.
@@ -91,21 +91,18 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
      *            The event.
      * @return true if the call was successful, false if the listener was blacklisted due to an exception or timeout.
      */
-    private boolean callListener(LK reference, L listener, E event) {
+    private boolean callListener(LK listenerKey, L listener, E event) {
         try {
             eventUtil.callListener(listener, event);
             return true;
         } catch (RuntimeException e) {
-            listeners.remove(reference);
-            // TODO log that listener is blacklisted
+            removeListener(listenerKey);
+            System.out.println("Listener got blacklisted: " + listenerKey.toString());
 
             return false;
         }
     }
 
-    /* (non-Javadoc)
-     * @see org.everit.osgi.eventdispatcher.core.ManagableEventDispatcher#dispatchAndRemoveEvent(E)
-     */
     @Override
     public void dispatchAndRemoveEvent(E event) {
         dispatchEventInternal(event, true);
@@ -135,9 +132,9 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
         }
 
         for (Entry<LK, L> listenerEntry : listeners.entrySet()) {
-            LK reference = listenerEntry.getKey();
+            LK listenerKey = listenerEntry.getKey();
             L listener = listenerEntry.getValue();
-            callListener(reference, listener, event);
+            callListener(listenerKey, listener, event);
         }
     }
 

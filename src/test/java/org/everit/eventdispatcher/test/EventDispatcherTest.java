@@ -32,68 +32,114 @@ import org.junit.Test;
 
 public class EventDispatcherTest {
 
-    private final class TestEventUtil implements EventUtil<Integer, Integer, Listener<Integer>> {
-        @Override
-        public Integer createReplayEvent(Integer originalEvent) {
-            return originalEvent * (-1);
-        }
-
-        @Override
-        public Integer getEventKey(Integer event) {
-            if (event > 0) {
-                return event;
-            } else {
-                return event * (-1);
-            }
-        }
-
-        @Override
-        public void callListener(Listener<Integer> listener, Integer event) {
-            listener.receiveEvent(event);
-        }
-    }
-
-    private final class TestListner implements Listener<Integer> {
-        private final List<Integer> collectedEvents;
-
-        private TestListner(List<Integer> collectedEvents) {
-            this.collectedEvents = collectedEvents;
-        }
-
-        @Override
-        public void receiveEvent(Integer event) {
-            collectedEvents.add(event);
-        }
-    }
-
     /**
-     * Testing one listener where normal events are positive numbers while the replay ones are their negative
-     * representation.
+     * Testing functionality on one thread.
      */
     @Test
-    public void testOneListener() {
+    public void testOneThread() {
         EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
                 new TestEventUtil();
 
         EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
                 new EventDispatcherImpl<Integer, Integer, Listener<Integer>, Listener<Integer>>(eventUtil);
 
-        final List<Integer> collectedEvents = new ArrayList<Integer>();
-        
-        Listener<Integer> listener1 = new TestListner(collectedEvents);
+        final List<ListenerWithEventEntry> collectedEvents = new ArrayList<ListenerWithEventEntry>();
+
+        Listener<Integer> listener1 = new TestListener(collectedEvents);
 
         eventDispatcher.dispatchEvent(1);
         eventDispatcher.dispatchEvent(2);
         eventDispatcher.dispatchEvent(3);
         eventDispatcher.removeEvent(2);
-        
+
         eventDispatcher.addListener(listener1, listener1);
         eventDispatcher.dispatchEvent(4);
+
+        Assert.assertEquals(Integer.valueOf(-1), collectedEvents.get(0).getEvent());
+        Assert.assertEquals(Integer.valueOf(-3), collectedEvents.get(1).getEvent());
+        Assert.assertEquals(Integer.valueOf(4), collectedEvents.get(2).getEvent());
+
+        eventDispatcher.dispatchAndRemoveEvent(1);
+        Assert.assertEquals(Integer.valueOf(1), collectedEvents.get(3).getEvent());
+
+        TestListener listener2 = new TestListener(collectedEvents);
+        eventDispatcher.addListener(listener2, listener2);
+
+        Assert.assertEquals(Integer.valueOf(-3), collectedEvents.get(4).getEvent());
+        Assert.assertEquals(Integer.valueOf(-4), collectedEvents.get(5).getEvent());
+
+        eventDispatcher.dispatchEvent(5);
+
+        ListenerWithEventEntry l1WithEvent = collectedEvents.get(6);
+        ListenerWithEventEntry l2WithEvent = collectedEvents.get(7);
+
+        Assert.assertEquals(listener1, l1WithEvent.getListener());
+        Assert.assertEquals(Integer.valueOf(5), l1WithEvent.getEvent());
+
+        Assert.assertEquals(listener2, l2WithEvent.getListener());
+        Assert.assertEquals(Integer.valueOf(5), l2WithEvent.getEvent());
+
+        collectedEvents.clear();
+
+        eventDispatcher.dispatchEvent(1);
+
+        l1WithEvent = collectedEvents.get(0);
+        l2WithEvent = collectedEvents.get(1);
+
+        Assert.assertEquals(listener1, l1WithEvent.getListener());
+        Assert.assertEquals(Integer.valueOf(1), l1WithEvent.getEvent());
+
+        Assert.assertEquals(listener2, l2WithEvent.getListener());
+        Assert.assertEquals(Integer.valueOf(1), l2WithEvent.getEvent());
+
+        eventDispatcher.removeListener(listener1);
+
+        collectedEvents.clear();
+
+        eventDispatcher.dispatchEvent(8);
+        Assert.assertEquals(1, collectedEvents.size());
+        Assert.assertEquals(8, collectedEvents.get(0).getEvent().intValue());
+
+        Assert.assertEquals(true, eventDispatcher.removeEvent(8));
+        Assert.assertEquals(false, eventDispatcher.removeEvent(8));
+
+        collectedEvents.clear();
+        eventDispatcher.removeEvent(3);
+        eventDispatcher.removeEvent(1);
+        eventDispatcher.removeEvent(4);
+
+        Listener<Integer> thirdFailListener = new Listener<Integer>() {
+
+            private int counter = 0;
+
+            @Override
+            public void receiveEvent(Integer event) {
+                counter++;
+                if (counter == 3) {
+                    throw new RuntimeException("Test exception");
+                }
+                collectedEvents.add(new ListenerWithEventEntry(this, event));
+            }
+        };
+
+        eventDispatcher.addListener(thirdFailListener, thirdFailListener);
+        Assert.assertEquals(-5, collectedEvents.get(0).getEvent().intValue());
+        eventDispatcher.dispatchAndRemoveEvent(5);
+        l1WithEvent = collectedEvents.get(1);
+        l2WithEvent = collectedEvents.get(2);
+
+        Assert.assertEquals(listener2, l1WithEvent.getListener());
+        Assert.assertEquals(Integer.valueOf(5), l1WithEvent.getEvent());
         
-        Assert.assertEquals(Integer.valueOf(-1), collectedEvents.get(0));
-        Assert.assertEquals(Integer.valueOf(-3), collectedEvents.get(1));
-        Assert.assertEquals(Integer.valueOf(4), collectedEvents.get(2));
+        Assert.assertEquals(thirdFailListener, l2WithEvent.getListener());
+        Assert.assertEquals(Integer.valueOf(5), l1WithEvent.getEvent());
         
+        collectedEvents.clear();
         
+        eventDispatcher.dispatchEvent(1);
+        
+        Assert.assertEquals(1, collectedEvents.size());
+        eventDispatcher.dispatchEvent(2);
+        Assert.assertEquals(2, collectedEvents.size());
     }
 }
