@@ -31,7 +31,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.everit.eventdispatcher.internal.EventWithReplayFlag;
-import org.everit.eventdispatcher.internal.ListenerData;
 
 // addListener                l(w)+
 //   listeners.add             ls(w) etr(r)
@@ -64,8 +63,8 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
 
     private final EventUtil<E, EK, L> eventUtil;
 
-    private Map<LK, ListenerData<L, E>> listeners =
-            new LinkedHashMap<LK, ListenerData<L, E>>();
+    private Map<LK, L> listeners =
+            new LinkedHashMap<LK, L>();
 
     public EventDispatcherImpl(EventUtil<E, EK, L> eventUtil) {
         this.eventUtil = eventUtil;
@@ -76,9 +75,8 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
      */
     @Override
     public void addListener(LK listenerKey, L listener) {
-        ListenerData<L, E> listenerData = new ListenerData<L, E>(listener);
         doReplaysForListener(listenerKey, listener);
-        listeners.put(listenerKey, listenerData);
+        listeners.put(listenerKey, listener);
     }
 
     /**
@@ -136,10 +134,10 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
             eventsToReplayWriteLocker.unlock();
         }
 
-        for (Entry<LK, ListenerData<L, E>> listenerEntry : listeners.entrySet()) {
+        for (Entry<LK, L> listenerEntry : listeners.entrySet()) {
             LK reference = listenerEntry.getKey();
-            ListenerData<L, E> listenerData = listenerEntry.getValue();
-            callListener(reference, listenerData.getListener(), event);
+            L listener = listenerEntry.getValue();
+            callListener(reference, listener, event);
         }
     }
 
