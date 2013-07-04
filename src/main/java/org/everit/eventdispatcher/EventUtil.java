@@ -31,6 +31,17 @@ package org.everit.eventdispatcher;
 public interface EventUtil<E, K, L> {
 
     /**
+     * A minimalistic function that simply solves the calling of the listener with the event object. The implemented
+     * function should do nothing else just call forwarding.
+     * 
+     * @param listener
+     *            The listener that is waiting for events.
+     * @param event
+     *            The original or the replayed event object.
+     */
+    void callListener(L listener, E event);
+
+    /**
      * Creating a new replay event based on the original event. Please note that event implementations should always be
      * immutable classes. If the implementing technology does not support event replays the result will be the same
      * object as the incoming parameter. In case the function returns null an Exception will be thrown by the caller.
@@ -45,19 +56,9 @@ public interface EventUtil<E, K, L> {
      * The function should return or generate a key object that identifies the event by it's {@link #hashCode()} and
      * {@link #equals(Object)} function. Based on that are replayed will override the previous event.
      * 
-     * @param event The event that contains the key.
+     * @param event
+     *            The event that contains the key.
      * @return The key of the event.
      */
     K getEventKey(E event);
-
-    /**
-     * A minimalistic function that simply solves the calling of the listener with the event object. The implemented
-     * function should do nothing else just call forwarding.
-     * 
-     * @param listener
-     *            The listener that is waiting for events.
-     * @param event
-     *            The original or the replayed event object.
-     */
-    void callListener(L listener, E event);
 }

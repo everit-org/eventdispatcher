@@ -1,4 +1,4 @@
-package org.everit.eventdispatcher.test;
+package org.everit.eventdispatcher;
 
 /*
  * Copyright (c) 2011, Everit Kft.
@@ -21,25 +21,20 @@ package org.everit.eventdispatcher.test;
  * MA 02110-1301  USA
  */
 
-import org.everit.eventdispatcher.EventUtil;
+public class ListenerAlreadyRegisteredException extends RuntimeException {
 
-final class TestEventUtil implements EventUtil<Integer, Integer, Listener<Integer>> {
-    @Override
-    public void callListener(final Listener<Integer> listener, final Integer event) {
-        listener.receiveEvent(event);
-    }
+    /**
+     * .
+     */
+    private static final long serialVersionUID = 1762270486998573494L;
 
-    @Override
-    public Integer createReplayEvent(final Integer originalEvent) {
-        return originalEvent * (-1);
-    }
-
-    @Override
-    public Integer getEventKey(final Integer event) {
-        if (event > 0) {
-            return event;
-        } else {
-            return event * (-1);
-        }
+    /**
+     * Constructor.
+     * 
+     * @param message
+     *            The message that contains the cause and the string representation of key of the listener.
+     */
+    ListenerAlreadyRegisteredException(final String message) {
+        super(message);
     }
 }

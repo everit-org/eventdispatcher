@@ -21,30 +21,42 @@ package org.everit.eventdispatcher.internal;
  * MA 02110-1301  USA
  */
 
+/**
+ * Internal class that holds an event object and the flag that shows if the event is already converted to replay format.
+ * 
+ * @param <E>
+ *            The type of the event.
+ */
 public class EventWithReplayFlag<E> {
 
+    /**
+     * A flag that shows if the event is converted to replay format.
+     */
     private boolean replay = false;
+
+    /**
+     * The original event object or the replay format.
+     */
     private E event;
 
-    public EventWithReplayFlag(E event) {
+    public EventWithReplayFlag(final E event) {
         this.event = event;
-    }
-
-    public boolean isReplay() {
-        return replay;
-    }
-
-    public void setReplay(boolean replay) {
-        this.replay = replay;
     }
 
     public E getEvent() {
         return event;
     }
 
-    public void setEvent(E event) {
+    public boolean isReplay() {
+        return replay;
+    }
+
+    public void setEvent(final E event) {
         this.event = event;
     }
-    
-    
+
+    public void setReplay(final boolean replay) {
+        this.replay = replay;
+    }
+
 }

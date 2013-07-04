@@ -1,4 +1,4 @@
-package org.everit.eventdispatcher.test;
+package org.everit.eventdispatcher.internal;
 
 /*
  * Copyright (c) 2011, Everit Kft.
@@ -21,25 +21,7 @@ package org.everit.eventdispatcher.test;
  * MA 02110-1301  USA
  */
 
-import org.everit.eventdispatcher.EventUtil;
+public interface TimeoutCallback<LK> {
 
-final class TestEventUtil implements EventUtil<Integer, Integer, Listener<Integer>> {
-    @Override
-    public void callListener(final Listener<Integer> listener, final Integer event) {
-        listener.receiveEvent(event);
-    }
-
-    @Override
-    public Integer createReplayEvent(final Integer originalEvent) {
-        return originalEvent * (-1);
-    }
-
-    @Override
-    public Integer getEventKey(final Integer event) {
-        if (event > 0) {
-            return event;
-        } else {
-            return event * (-1);
-        }
-    }
+    void takeListenerToBlacklist(LK listenerKey);
 }

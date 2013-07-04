@@ -32,12 +32,12 @@ public class ListenerWithEventEntry {
         this.event = event;
     }
 
-    public Listener<Integer> getListener() {
-        return listener;
-    }
-
     public Integer getEvent() {
         return event;
+    }
+
+    public Listener<Integer> getListener() {
+        return listener;
     }
 
     @Override

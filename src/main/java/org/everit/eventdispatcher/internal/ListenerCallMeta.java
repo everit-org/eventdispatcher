@@ -1,4 +1,4 @@
-package org.everit.eventdispatcher.test;
+package org.everit.eventdispatcher.internal;
 
 /*
  * Copyright (c) 2011, Everit Kft.
@@ -21,25 +21,23 @@ package org.everit.eventdispatcher.test;
  * MA 02110-1301  USA
  */
 
-import org.everit.eventdispatcher.EventUtil;
+public class ListenerCallMeta<LK> {
 
-final class TestEventUtil implements EventUtil<Integer, Integer, Listener<Integer>> {
-    @Override
-    public void callListener(final Listener<Integer> listener, final Integer event) {
-        listener.receiveEvent(event);
+    private long callTime;
+
+    private LK listenerKey;
+
+    public ListenerCallMeta(final LK listenerKey, final long callTime) {
+        this.listenerKey = listenerKey;
+        this.callTime = callTime;
     }
 
-    @Override
-    public Integer createReplayEvent(final Integer originalEvent) {
-        return originalEvent * (-1);
+    public long getCallTime() {
+        return callTime;
     }
 
-    @Override
-    public Integer getEventKey(final Integer event) {
-        if (event > 0) {
-            return event;
-        } else {
-            return event * (-1);
-        }
+    public LK getListenerKey() {
+        return listenerKey;
     }
+
 }

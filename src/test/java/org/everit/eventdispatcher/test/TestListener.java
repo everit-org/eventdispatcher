@@ -24,15 +24,15 @@ package org.everit.eventdispatcher.test;
 import java.util.List;
 
 final class TestListener implements Listener<Integer> {
-    
+
     private final List<ListenerWithEventEntry> collectedEvents;
 
-    TestListener(List<ListenerWithEventEntry> collectedEvents) {
+    TestListener(final List<ListenerWithEventEntry> collectedEvents) {
         this.collectedEvents = collectedEvents;
     }
 
     @Override
-    public void receiveEvent(Integer event) {
+    public void receiveEvent(final Integer event) {
         collectedEvents.add(new ListenerWithEventEntry(this, event));
     }
 }
