@@ -88,7 +88,6 @@ public class TimeoutCheckerThread<LK> extends Thread {
         synchronized (waiter) {
             waiter.notify();
         }
-
     }
 
     public ListenerCallMeta<LK> startCall(final LK listenerKey) {

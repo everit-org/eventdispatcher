@@ -33,7 +33,7 @@
     </parent>
 
     <artifactId>org.everit.eventdispatcher</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0.alpha</version>
 
     <packaging>bundle</packaging>
     <name>Everit EventDispatcher</name>
