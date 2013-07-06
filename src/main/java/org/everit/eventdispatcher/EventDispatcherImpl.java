@@ -170,14 +170,21 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
     public EventDispatcherImpl(final EventUtil<E, EK, L> eventUtil, final long listenerCallTimeout) {
         this.eventUtil = eventUtil;
         this.listenerCallTimeout = listenerCallTimeout;
-        this.timeoutChecker = new TimeoutCheckerThread<LK>(listenerCallTimeout, new TimeoutCallback<LK>() {
+        if (listenerCallTimeout > 0) {
+            this.timeoutChecker = new TimeoutCheckerThread<LK>(listenerCallTimeout, new TimeoutCallback<LK>() {
 
-            @Override
-            public void takeListenerToBlacklist(final LK listenerKey) {
-                markListenerBlackListed(listenerKey, null);
+                @Override
+                public void takeListenerToBlacklist(final LK listenerKey) {
+                    markListenerBlackListed(listenerKey, null);
+                }
+            });
+            new Thread(timeoutChecker).start();
+        } else {
+            this.timeoutChecker = null;
+            if (listenerCallTimeout < 0) {
+                throw new IllegalArgumentException("Listener call timeout must be zero or a positive number.");
             }
-        });
-        new Thread(timeoutChecker).start();
+        }
     }
 
     @Override
@@ -186,30 +193,30 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
         ReentrantReadWriteLock locker = listenerData.getLocker();
         WriteLock listenerWriteLock = locker.writeLock();
         listenerWriteLock.lock();
-        try {
-            WriteLock listenersWriteLock = listenersLocker.writeLock();
-            listenersWriteLock.lock();
-            ReadLock etrReadLock = etrLocker.readLock();
-            etrReadLock.lock();
-            Collection<E> cloneOfCurrentReplayEvents;
-            try {
-                ListenerData<L> alreadyRegisteredListener = listeners.put(listenerKey, listenerData);
-                if (alreadyRegisteredListener != null) {
-                    throw new ListenerAlreadyRegisteredException("Listener with key " + listenerKey.toString()
-                            + " is already registered");
-                }
-                cloneOfCurrentReplayEvents = getCloneOfCurrentReplayEvents(listenerKey, listener);
-            } finally {
-                etrReadLock.unlock();
-                listenersWriteLock.unlock();
-            }
 
-            for (E event : cloneOfCurrentReplayEvents) {
-                callListener(listenerKey, listenerData, event);
-            }
-        } finally {
+        WriteLock listenersWriteLock = listenersLocker.writeLock();
+        listenersWriteLock.lock();
+        ReadLock etrReadLock = etrLocker.readLock();
+        etrReadLock.lock();
+
+        ListenerData<L> alreadyRegisteredListener = listeners.put(listenerKey, listenerData);
+        if (alreadyRegisteredListener != null) {
+            etrReadLock.unlock();
+            listenersWriteLock.unlock();
             listenerWriteLock.unlock();
+            throw new ListenerAlreadyRegisteredException("Listener with key " + listenerKey.toString()
+                    + " is already registered");
         }
+        Collection<E> cloneOfCurrentReplayEvents = getCloneOfCurrentReplayEvents(listenerKey, listener);
+
+        etrReadLock.unlock();
+        listenersWriteLock.unlock();
+
+        for (E event : cloneOfCurrentReplayEvents) {
+            callListener(listenerKey, listenerData, event);
+        }
+
+        listenerWriteLock.unlock();
 
     }
 
@@ -230,29 +237,37 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
         ReentrantReadWriteLock listenerLocker = listenerData.getLocker();
         ReadLock listenerReadLock = listenerLocker.readLock();
         listenerReadLock.lock();
+        boolean result = true;
 
-        try {
-            if (isListenerActive(listenerKey)) {
-                ListenerCallMeta<LK> listenerCallMeta = timeoutChecker.startCall(listenerKey);
-                try {
-                    eventUtil.callListener(listenerData.getListener(), event);
-                } finally {
-                    timeoutChecker.callEnded(listenerCallMeta);
-                }
+        if (isListenerActive(listenerKey)) {
+            ListenerCallMeta<LK> listenerCallMeta = null;
+            if (timeoutChecker != null) {
+                listenerCallMeta = timeoutChecker.startCall(listenerKey);
             }
-            return true;
-        } catch (RuntimeException e) {
-            markListenerBlackListed(listenerKey, e);
-            return false;
-        } finally {
-            listenerReadLock.unlock();
+
+            try {
+                eventUtil.callListener(listenerData.getListener(), event);
+            } catch (RuntimeException e) {
+                markListenerBlackListed(listenerKey, e);
+                result = false;
+            }
+            if (timeoutChecker != null) {
+                timeoutChecker.callEnded(listenerCallMeta);
+            }
         }
+
+        listenerReadLock.unlock();
+        return result;
+
     }
 
     @Override
     public void close() {
         stopped = true;
-        timeoutChecker.shutdown();
+        if (timeoutChecker != null) {
+            timeoutChecker.shutdown();
+        }
+
     }
 
     @Override
@@ -325,11 +340,10 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
 
         ReadLock listenersReadLock = listenersLocker.readLock();
         listenersReadLock.lock();
-        try {
-            return listeners.containsKey(listenerKey);
-        } finally {
-            listenersReadLock.unlock();
-        }
+        boolean result = listeners.containsKey(listenerKey);
+        listenersReadLock.unlock();
+
+        return result;
     }
 
     @Override
@@ -360,7 +374,7 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
         WriteLock listenersWriteLock = listenersLocker.writeLock();
         listenersWriteLock.lock();
 
-        boolean result = listeners.remove(listenerKey) == null;
+        boolean result = listeners.remove(listenerKey) != null;
         blackListedListeners.remove(listenerKey);
 
         listenersWriteLock.unlock();

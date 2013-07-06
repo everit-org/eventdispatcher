@@ -44,9 +44,6 @@ public class TimeoutCheckerThread<LK> extends Thread {
     private final Object waiter = new Object();
 
     public TimeoutCheckerThread(final long timeout, final TimeoutCallback<LK> timeoutCallback) {
-        if (timeout < 1) {
-            throw new IllegalArgumentException("Timeout must be at least one millisec");
-        }
         this.timeoutCallback = timeoutCallback;
         this.timeout = timeout;
     }
@@ -60,32 +57,29 @@ public class TimeoutCheckerThread<LK> extends Thread {
         while (!stopped) {
             ListenerCallMeta<LK> listenerCall = callQueue.peek();
             if (listenerCall == null) {
-                try {
-                    // Waiting (max the timeout)
-                    synchronized (waiter) {
-                        waiter.wait(timeout);
-                    }
-                } catch (InterruptedException e) {
-                    stopped = true;
-                    interrupt();
-                }
+                waitAndStopIfInterrupted(timeout);
             } else {
                 long currentTime = new Date().getTime();
                 long callTime = listenerCall.getCallTime();
                 long gap = (callTime + timeout) - currentTime;
                 if (gap > 0) {
-                    try {
-                        synchronized (waiter) {
-                            waiter.wait(gap);
-                        }
-                    } catch (InterruptedException e) {
-                        stopped = true;
-                    }
+                    waitAndStopIfInterrupted(gap);
                 } else {
                     timeoutCallback.takeListenerToBlacklist(listenerCall.getListenerKey());
                     callQueue.remove(listenerCall);
                 }
             }
+        }
+    }
+
+    private void waitAndStopIfInterrupted(long millis) {
+        try {
+            synchronized (waiter) {
+                waiter.wait(millis);
+            }
+        } catch (InterruptedException e) {
+            stopped = true;
+            interrupt();
         }
     }
 

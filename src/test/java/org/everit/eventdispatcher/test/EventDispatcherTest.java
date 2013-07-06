@@ -21,6 +21,7 @@ package org.everit.eventdispatcher.test;
  * MA 02110-1301  USA
  */
 
+import java.lang.Thread.State;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -164,13 +165,32 @@ public class EventDispatcherTest {
         } catch (ListenerAlreadyRegisteredException e) {
             // Do nothing as this is the right behavior
         }
+
+        // Removing a listener returns true
+        Assert.assertTrue(eventDispatcher.removeListener(listener2));
+        // Removing a listener when it is not registered returns false
+        Assert.assertFalse(eventDispatcher.removeListener(listener2));
+
         eventDispatcher.close();
+        try {
+            eventDispatcher.dispatchEvent(5);
+            Assert.fail("Closing a closed event dispatcher must throw an IllegalStateException");
+        } catch (IllegalStateException e) {
+            // Good behavior
+        }
     }
 
     @Test
     public void testTimeout() {
         EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
                 new TestEventUtil();
+
+        try {
+            new EventDispatcherImpl<Integer, Integer, Listener<Integer>, Listener<Integer>>(eventUtil, -1);
+            Assert.fail("Only positive numbers are supported as timeout values");
+        } catch (IllegalArgumentException e) {
+            // Right behavior
+        }
 
         EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
                 new EventDispatcherImpl<Integer, Integer, Listener<Integer>, Listener<Integer>>(eventUtil, 50);
@@ -204,5 +224,42 @@ public class EventDispatcherTest {
         eventDispatcher.addListener(waitingListener, waitingListener);
         Assert.assertTrue(eventDispatcher.isListenerBlacklisted(waitingListener));
         eventDispatcher.close();
+
+        final EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> foreverWaitingEventDispatcher =
+                new EventDispatcherImpl<Integer, Integer, Listener<Integer>, Listener<Integer>>(eventUtil, 0);
+
+        Listener<Integer> forewerWaitingListener = new Listener<Integer>() {
+
+            @Override
+            public void receiveEvent(Integer event) {
+                try {
+                    Thread.sleep(500000);
+                    Assert.fail("This thread should be interrupted.");
+                } catch (InterruptedException e) {
+                    // Good behavior
+                }
+            }
+        };
+
+        foreverWaitingEventDispatcher.addListener(forewerWaitingListener, forewerWaitingListener);
+
+        Thread forewerWaitingThread = new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                foreverWaitingEventDispatcher.dispatchAndRemoveEvent(1);
+            }
+        });
+        forewerWaitingThread.start();
+        while (forewerWaitingThread.getState() != State.TIMED_WAITING
+                && forewerWaitingThread.getState() != State.TERMINATED) {
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                Assert.fail(e.getMessage());
+            }
+        }
+        forewerWaitingThread.interrupt();
+        foreverWaitingEventDispatcher.close();
     }
 }

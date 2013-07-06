@@ -60,6 +60,9 @@ public interface EventDispatcher<E, EK, L, LK> extends Closeable {
 
     /**
      * Freeing up any resource (like the timeout checker thread)
+     * 
+     * @throws IllegalStateException
+     *             if the Event Dispatcher is already closed.
      */
     @Override
     public void close();
@@ -70,8 +73,10 @@ public interface EventDispatcher<E, EK, L, LK> extends Closeable {
      * 
      * @param event
      *            The event object.
+     * @throws IllegalStateException
+     *             if the dipatcher is already closed.
      */
-    void dispatchAndRemoveEvent(E event);
+    void dispatchAndRemoveEvent(E event) throws IllegalStateException;
 
     /**
      * Dispatching a new event to the listeners. The event is dispatched to the listeners that are already registered
@@ -80,8 +85,10 @@ public interface EventDispatcher<E, EK, L, LK> extends Closeable {
      * 
      * @param event
      *            The event object.
+     * @throws IllegalStateException
+     *             if the dipatcher is already closed.
      */
-    void dispatchEvent(E event);
+    void dispatchEvent(E event) throws IllegalStateException;
 
     /**
      * The listener has the specified timeout to process an event otherwise it will be blacklisted and will not receive
