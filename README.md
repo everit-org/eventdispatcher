@@ -29,6 +29,9 @@ When the four types are defined the programmer can instantiate
 EventDispatcherImpl. See the JavaDoc of that class about constructor
 parameters.
 
+For more information see the [maven generated site][1].
+
+[1]: http://everit.org/mvnsites/eventdispatcher
 
 Motivation
 ----------
