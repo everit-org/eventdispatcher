@@ -4,10 +4,6 @@ eventdispatcher
 Utility classes to be able to write an event dispatcher that sends
 historical "replay" event data to newly registered listeners as well.
 
-In case a listener throws an exception or does not give a response
-in a timeout it will be blacklisted and no event will be dispatched
-to that listener in the future.
-
 The programmer must define four types to be able to use this library:
 
  - Type of the listener
@@ -28,24 +24,3 @@ registration.
 When the four types are defined the programmer can instantiate
 EventDispatcherImpl. See the JavaDoc of that class about constructor
 parameters.
-
-For more information see the [maven generated site][1].
-
-[1]: http://everit.org/mvnsites/eventdispatcher
-
-Motivation
-----------
-
-This library was created during implementing the Blueprint OSGi Enterprise
-5.0 specification. In Blueprint there is an event dispatching mechanism
-described that could be used by other technologies as well. The library
-itself does not contains any blueprint specific code, it will be used from
-the new Blueprint implementation.
-
-Roadmap
--------
-
-After using the library from other technologies without bug report, 1.0.0
-will be released. The library itself is atomic enough not to have many
-new features in the future. Till 1.0.0 more documents will be created and
-a bit more possibility to handle timeouts.

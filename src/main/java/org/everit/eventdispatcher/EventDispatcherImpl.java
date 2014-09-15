@@ -1,41 +1,35 @@
+/**
+ * This file is part of Everit - Event dispatcher.
+ *
+ * Everit - Event dispatcher is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Everit - Event dispatcher is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with Everit - Event dispatcher.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.everit.eventdispatcher;
 
-/*
- * Copyright (c) 2011, Everit Kft.
- *
- * All rights reserved.
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301  USA
- */
-
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
+import org.everit.eventdispatcher.internal.DefaultExceptionHandler;
 import org.everit.eventdispatcher.internal.EventWithReplayFlag;
-import org.everit.eventdispatcher.internal.ListenerCallMeta;
 import org.everit.eventdispatcher.internal.ListenerData;
-import org.everit.eventdispatcher.internal.TimeoutCallback;
-import org.everit.eventdispatcher.internal.TimeoutCheckerThread;
 
 /**
  * Helper class to dispatch events to listeners. The dispatcher calls every listener that are already registered with
@@ -46,21 +40,20 @@ import org.everit.eventdispatcher.internal.TimeoutCheckerThread;
  * <br />
  * The class uses three different {@link ReentrantReadWriteLock}s. By using these locks the purpose was to have as less
  * locking during event dispatching as it is possible. The three locks are:
- * 
+ *
  * <ul>
  * <li>l+: A lock on the listener instance. The plus sign means that each listener has it's own locker object.</li>
  * <li>etr: Locking on the {@link #eventsToReplay} collection.</li>
  * <li>ls: Locking on the collection of listeners</li>
  * </ul>
- * 
+ *
  * In the following part read and write locks are marked with (r) and (w) expressions. For example ls(r) means that
- * there
- * is a read lock on the listener instance while ls(w) means a write lock. <br />
+ * there is a read lock on the listener instance while ls(w) means a write lock. <br />
  * <br />
- * 
+ *
  * The following list shows the functions in this class and the locks that are used in the function calls. The scope of
  * the lock is the same as the scope of the list entry:
- * 
+ *
  * <ul>
  * <li><b>l(w)+</b></li>
  * <ul>
@@ -75,8 +68,7 @@ import org.everit.eventdispatcher.internal.TimeoutCheckerThread;
  * <ul>
  * <li>{@link #callListener(Object, ListenerData, Object)} <b>l(r)+</b></li>
  * </ul>
- * </ul>
- * </ul> <li>{@link #dispatchEvent(Object)}</li>
+ * </ul> </ul> <li>{@link #dispatchEvent(Object)}</li>
  * <ul>
  * <li><b>etr(w)</b>: Modify {@link #eventsToReplay} (remove and put if necessary).</li>
  * <li><b>ls(r)</b>: {@link #listeners}.clone()</li>
@@ -86,7 +78,7 @@ import org.everit.eventdispatcher.internal.TimeoutCheckerThread;
  * </ul>
  * </ul> <li><b>etr(w)</b>: {@link #removeEvent(Object)}</li> <li><b>ls(w)</b>: {@link #removeListener(Object)}</li><li>
  * <b>l(r)+</b>: {@link #callListener(Object, ListenerData, Object)}</li> </ul>
- * 
+ *
  * Please note that {@link #callListener(Object, ListenerData, Object)} is called from two places. The mentioned l(r)+
  * lock is placed into the function call. In the {@link #callListener(Object, ListenerData, Object)} it is also checked
  * with a ls(r) lock if the listener is still active to avoid the possibility of calling a listener that was removed
@@ -94,7 +86,7 @@ import org.everit.eventdispatcher.internal.TimeoutCheckerThread;
  * programmer must implement the {@link EventUtil} interface and pass it to the constructor of this class. After that
  * listeners can be registered and events can be dispatched via the {@link EventDispatcher} interface. For more
  * information please see the documentation of the mentioned interfaces.
- * 
+ *
  * @param <E>
  *            The type of the events.
  * @param <EK>
@@ -109,14 +101,26 @@ import org.everit.eventdispatcher.internal.TimeoutCheckerThread;
 public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK, L, LK> {
 
     /**
+     * Fair read-write locker of the events that should be replayed in case a new listener is registered.
+     */
+    private final ReentrantReadWriteLock etrLocker = new ReentrantReadWriteLock(true);
+
+    /**
      * The map of events that should be replayed in case of a new listener registration. The map contains both
      */
-    private LinkedHashMap<EK, EventWithReplayFlag<E>> eventsToReplay = new LinkedHashMap<EK, EventWithReplayFlag<E>>();
+    private final LinkedHashMap<EK, EventWithReplayFlag<E>> eventsToReplay = new LinkedHashMap<EK, EventWithReplayFlag<E>>();
 
     /**
      * The util class that must be implemented by the programmer who uses the {@link EventDispatcher} functionality.
      */
     private final EventUtil<E, EK, L> eventUtil;
+
+    private final ExceptionHandler<LK, E> exceptionHandler;
+
+    /**
+     * Listeners based on their key that are currently registered in registration order.
+     */
+    private final Map<LK, ListenerData<L>> listeners = new LinkedHashMap<LK, ListenerData<L>>();
 
     /**
      * Fair read-write locker for the listener collection.
@@ -124,66 +128,32 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
     private final ReentrantReadWriteLock listenersLocker = new ReentrantReadWriteLock(true);
 
     /**
-     * Fair read-write locker of the events that should be replayed in case a new listener is registered.
-     */
-    private final ReentrantReadWriteLock etrLocker = new ReentrantReadWriteLock(true);
-
-    private boolean stopped = false;
-
-    /**
-     * Listeners that are blacklisted due to a timeout or exception.
-     */
-    private final Map<LK, Boolean> blackListedListeners = new ConcurrentHashMap<LK, Boolean>();
-
-    private final TimeoutCheckerThread<LK> timeoutChecker;
-
-    /**
-     * Listeners based on their key that are currently registered in registration order.
-     */
-    private Map<LK, ListenerData<L>> listeners = new LinkedHashMap<LK, ListenerData<L>>();
-
-    /**
-     * See {@link EventDispatcher#getListenerCallTimeout()}.
-     */
-    private final long listenerCallTimeout;
-
-    /**
      * Simpler constructor that sets the {@link EventDispatcher#DEFAULT_LISTENER_CALL_TIMEOUT} as the timeout for event
      * processing.
-     * 
+     *
      * @param eventUtil
      *            The object that must be implemented and passed by the programmer to be able to use this library.
      */
     public EventDispatcherImpl(final EventUtil<E, EK, L> eventUtil) {
-        this(eventUtil, EventDispatcher.DEFAULT_LISTENER_CALL_TIMEOUT);
+        this(eventUtil, null);
     }
 
     /**
      * Constructor.
-     * 
+     *
      * @param eventUtil
      *            The object that must be implemented and passed by the programmer to be able to use this library.
-     * 
-     * @param listenerCallTimeout
-     *            See {@link #getListenerCallTimeout()}.
+     *
+     * @param exceptionHandler
+     *            The handler that catches exceptions that come from listeners. If null, the default implementation will
+     *            be used that writes exceptions to the standard error output.
      */
-    public EventDispatcherImpl(final EventUtil<E, EK, L> eventUtil, final long listenerCallTimeout) {
+    public EventDispatcherImpl(final EventUtil<E, EK, L> eventUtil, final ExceptionHandler<LK, E> exceptionHandler) {
         this.eventUtil = eventUtil;
-        this.listenerCallTimeout = listenerCallTimeout;
-        if (listenerCallTimeout > 0) {
-            this.timeoutChecker = new TimeoutCheckerThread<LK>(listenerCallTimeout, new TimeoutCallback<LK>() {
-
-                @Override
-                public void takeListenerToBlacklist(final LK listenerKey) {
-                    markListenerBlackListed(listenerKey, null);
-                }
-            });
-            new Thread(timeoutChecker).start();
+        if (exceptionHandler != null) {
+            this.exceptionHandler = exceptionHandler;
         } else {
-            this.timeoutChecker = null;
-            if (listenerCallTimeout < 0) {
-                throw new IllegalArgumentException("Listener call timeout must be zero or a positive number.");
-            }
+            this.exceptionHandler = new DefaultExceptionHandler<LK, E>();
         }
     }
 
@@ -223,50 +193,37 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
     /**
      * Calling a listener with an event. In case there is any exception or a timeout the listener will be removed from
      * the listeners collection and no more events will be passed.
-     * 
+     *
      * @param listenerKey
      *            The reference of the listener OSGi service.
      * @param listener
      *            The listener object.
      * @param event
      *            The event.
-     * @return true if the call was successful, false if the listener was blacklisted due to an exception or timeout.
      */
-    private boolean callListener(final LK listenerKey, final ListenerData<L> listenerData, final E event) {
+    private void callListener(final LK listenerKey, final ListenerData<L> listenerData, final E event) {
 
         ReentrantReadWriteLock listenerLocker = listenerData.getLocker();
         ReadLock listenerReadLock = listenerLocker.readLock();
         listenerReadLock.lock();
-        boolean result = true;
 
-        if (isListenerActive(listenerKey)) {
-            ListenerCallMeta<LK> listenerCallMeta = null;
-            if (timeoutChecker != null) {
-                listenerCallMeta = timeoutChecker.startCall(listenerKey);
-            }
-
+        try {
+            eventUtil.callListener(listenerData.getListener(), event);
+        } catch (Throwable e) {
             try {
-                eventUtil.callListener(listenerData.getListener(), event);
-            } catch (RuntimeException e) {
-                markListenerBlackListed(listenerKey, e);
-                result = false;
-            }
-            if (timeoutChecker != null) {
-                timeoutChecker.callEnded(listenerCallMeta);
+                exceptionHandler.handleException(listenerKey, event, e);
+            } catch (RuntimeException handlerE) {
+                e.addSuppressed(handlerE);
+                StringWriter sw = new StringWriter();
+                PrintWriter pw = new PrintWriter(sw);
+                sw.write("Error during calling exception handler after recieving an exception from listener '"
+                        + listenerKey.toString() + "' with the event: " + event.toString() + "\n");
+                e.printStackTrace(pw);
+                System.err.println(sw.toString());
             }
         }
 
         listenerReadLock.unlock();
-        return result;
-
-    }
-
-    @Override
-    public void close() {
-        stopped = true;
-        if (timeoutChecker != null) {
-            timeoutChecker.shutdown();
-        }
 
     }
 
@@ -281,10 +238,6 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
     }
 
     private void dispatchEventInternal(final E event, final boolean removeAfterDispatch) {
-        if (stopped) {
-            throw new IllegalStateException("Event dispatcher is already stopped");
-        }
-
         EK eventKey = eventUtil.getEventKey(event);
 
         WriteLock etrWriteLock = etrLocker.writeLock();
@@ -329,36 +282,6 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
     }
 
     @Override
-    public long getListenerCallTimeout() {
-        return this.listenerCallTimeout;
-    }
-
-    private boolean isListenerActive(final LK listenerKey) {
-        if (isListenerBlacklisted(listenerKey)) {
-            return false;
-        }
-
-        ReadLock listenersReadLock = listenersLocker.readLock();
-        listenersReadLock.lock();
-        boolean result = listeners.containsKey(listenerKey);
-        listenersReadLock.unlock();
-
-        return result;
-    }
-
-    @Override
-    public boolean isListenerBlacklisted(final LK listenerKey) {
-        return blackListedListeners.containsKey(listenerKey);
-    }
-
-    private void markListenerBlackListed(final LK listenerKey, final Exception e) {
-        blackListedListeners.put(listenerKey, true);
-        System.out.println("Listener got blacklisted: " + listenerKey.toString() + ". Reason: "
-                + ((e == null) ? "timeout." : e.getMessage()));
-        // TODO log blacklisting with cause.
-    }
-
-    @Override
     public boolean removeEvent(final EK eventKey) {
         WriteLock etrWriteLock = etrLocker.writeLock();
         etrWriteLock.lock();
@@ -375,7 +298,6 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
         listenersWriteLock.lock();
 
         boolean result = listeners.remove(listenerKey) != null;
-        blackListedListeners.remove(listenerKey);
 
         listenersWriteLock.unlock();
         return result;

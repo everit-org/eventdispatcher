@@ -14,22 +14,23 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with Everit - Event dispatcher.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.everit.eventdispatcher;
+package org.everit.eventdispatcher.internal;
 
-public class ListenerAlreadyRegisteredException extends RuntimeException {
+import java.io.PrintWriter;
+import java.io.StringWriter;
 
-    /**
-     * .
-     */
-    private static final long serialVersionUID = 1762270486998573494L;
+import org.everit.eventdispatcher.ExceptionHandler;
 
-    /**
-     * Constructor.
-     *
-     * @param message
-     *            The message that contains the cause and the string representation of key of the listener.
-     */
-    ListenerAlreadyRegisteredException(final String message) {
-        super(message);
+public class DefaultExceptionHandler<LK, E> implements ExceptionHandler<LK, E> {
+
+    @Override
+    public void handleException(LK listenerKey, E event, Throwable e) {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        stringWriter.write("Exception during calling listener: [listener key='" + listenerKey.toString() + "', event='"
+                + event.toString() + "']\n");
+        e.printStackTrace(printWriter);
+        System.err.println(stringWriter.toString());
     }
+
 }
