@@ -179,33 +179,44 @@ public class EventDispatcherImpl<E, EK, L, LK> implements EventDispatcher<E, EK,
       throws ListenerAlreadyRegisteredException {
     ListenerData<L> listenerData = new ListenerData<>(listener);
     ReentrantReadWriteLock locker = listenerData.getLocker();
+
     WriteLock listenerWriteLock = locker.writeLock();
     listenerWriteLock.lock();
+    try {
 
-    WriteLock listenersWriteLock = this.listenersLocker.writeLock();
-    listenersWriteLock.lock();
-    ReadLock etrReadLock = this.etrLocker.readLock();
-    etrReadLock.lock();
+      Collection<E> cloneOfCurrentReplayEvents;
 
-    ListenerData<L> alreadyRegisteredListener = this.listeners.put(listenerKey, listenerData);
-    if (alreadyRegisteredListener != null) {
-      etrReadLock.unlock();
-      listenersWriteLock.unlock();
+      WriteLock listenersWriteLock = this.listenersLocker.writeLock();
+      listenersWriteLock.lock();
+      try {
+        ReadLock etrReadLock = this.etrLocker.readLock();
+        etrReadLock.lock();
+        try {
+
+          ListenerData<L> alreadyRegisteredListener = this.listeners.put(listenerKey, listenerData);
+
+          if (alreadyRegisteredListener != null) {
+            throw new ListenerAlreadyRegisteredException(
+                "Listener with key " + listenerKey.toString()
+                    + " is already registered");
+          }
+
+          cloneOfCurrentReplayEvents = getCloneOfCurrentReplayEvents();
+
+        } finally {
+          etrReadLock.unlock();
+        }
+      } finally {
+        listenersWriteLock.unlock();
+      }
+
+      for (E event : cloneOfCurrentReplayEvents) {
+        callListener(listenerKey, listenerData, event);
+      }
+
+    } finally {
       listenerWriteLock.unlock();
-      throw new ListenerAlreadyRegisteredException("Listener with key " + listenerKey.toString()
-          + " is already registered");
     }
-    Collection<E> cloneOfCurrentReplayEvents = getCloneOfCurrentReplayEvents();
-
-    etrReadLock.unlock();
-    listenersWriteLock.unlock();
-
-    for (E event : cloneOfCurrentReplayEvents) {
-      callListener(listenerKey, listenerData, event);
-    }
-
-    listenerWriteLock.unlock();
-
   }
 
   /**
