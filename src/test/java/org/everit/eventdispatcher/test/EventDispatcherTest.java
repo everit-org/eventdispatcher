@@ -1,18 +1,17 @@
-/**
- * This file is part of Everit - Event dispatcher.
+/*
+ * Copyright (C) 2011 Everit Kft. (http://www.everit.org)
  *
- * Everit - Event dispatcher is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Everit - Event dispatcher is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ *         http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Everit - Event dispatcher.  If not, see <http://www.gnu.org/licenses/>.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.everit.eventdispatcher.test;
 
@@ -30,177 +29,181 @@ import org.junit.Test;
 
 public class EventDispatcherTest {
 
-    @Test
-    public void testExceptionHandler() {
-        final AtomicReference<Throwable> caughedException = new AtomicReference<Throwable>();
+  @Test
+  public void testExceptionHandler() {
+    final AtomicReference<Throwable> caughedException = new AtomicReference<>();
 
-        ExceptionHandler<Listener<Integer>, Integer> exceptionHandler =
-                new ExceptionHandler<Listener<Integer>, Integer>() {
+    ExceptionHandler<Listener<Integer>, Integer> exceptionHandler =
+        new ExceptionHandler<Listener<Integer>, Integer>() {
 
-                    @Override
-                    public void handleException(Listener<Integer> listenerKey, Integer event, Throwable e) {
-                        caughedException.set(e);
-                    }
-                };
-
-        EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
-                new TestEventUtil();
-
-        EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
-                new EventDispatcherImpl<Integer, Integer, Listener<Integer>, Listener<Integer>>(eventUtil,
-                        exceptionHandler);
-
-        Listener<Integer> alwaysThrowsExceptionListener = new Listener<Integer>() {
-
-            @Override
-            public void receiveEvent(Integer event) {
-                throw new RuntimeException("Dropped");
-            }
+          @Override
+          public void handleException(final Listener<Integer> listenerKey, final Integer event,
+              final Throwable e) {
+            caughedException.set(e);
+          }
         };
 
-        eventDispatcher.addListener(alwaysThrowsExceptionListener, alwaysThrowsExceptionListener);
+    EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
+        new TestEventUtil();
 
-        eventDispatcher.dispatchEvent(0);
+    EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
+        new EventDispatcherImpl<>(eventUtil,
+            exceptionHandler);
 
-        Assert.assertNotNull(caughedException.get());
-        Assert.assertEquals("Dropped", caughedException.get().getMessage());
+    Listener<Integer> alwaysThrowsExceptionListener = new Listener<Integer>() {
 
-    }
+      @Override
+      public void receiveEvent(final Integer event) {
+        throw new RuntimeException("Dropped");
+      }
+    };
 
-    @Test
-    public void testExceptionHandlerThrowsException() {
-        ExceptionHandler<Listener<Integer>, Integer> exceptionHandler =
-                new ExceptionHandler<Listener<Integer>, Integer>() {
+    eventDispatcher.addListener(alwaysThrowsExceptionListener, alwaysThrowsExceptionListener);
 
-                    @Override
-                    public void handleException(Listener<Integer> listenerKey, Integer event, Throwable e) {
-                        throw new RuntimeException("Dropped from exception handler");
-                    }
-                };
+    eventDispatcher.dispatchEvent(0);
 
-        EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
-                new TestEventUtil();
+    Assert.assertNotNull(caughedException.get());
+    Assert.assertEquals("Dropped", caughedException.get().getMessage());
 
-        EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
-                new EventDispatcherImpl<Integer, Integer, Listener<Integer>, Listener<Integer>>(eventUtil,
-                        exceptionHandler);
+  }
 
-        Listener<Integer> alwaysThrowsExceptionListener = new Listener<Integer>() {
+  @Test
+  public void testExceptionHandlerThrowsException() {
+    ExceptionHandler<Listener<Integer>, Integer> exceptionHandler =
+        new ExceptionHandler<Listener<Integer>, Integer>() {
 
-            @Override
-            public void receiveEvent(Integer event) {
-                throw new RuntimeException("Dropped from listener");
-            }
+          @Override
+          public void handleException(final Listener<Integer> listenerKey, final Integer event,
+              final Throwable e) {
+            throw new RuntimeException("Dropped from exception handler");
+          }
         };
 
-        eventDispatcher.addListener(alwaysThrowsExceptionListener, alwaysThrowsExceptionListener);
+    EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
+        new TestEventUtil();
 
-        eventDispatcher.dispatchEvent(0);
+    EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
+        new EventDispatcherImpl<>(eventUtil,
+            exceptionHandler);
+
+    Listener<Integer> alwaysThrowsExceptionListener = new Listener<Integer>() {
+
+      @Override
+      public void receiveEvent(final Integer event) {
+        throw new RuntimeException("Dropped from listener");
+      }
+    };
+
+    eventDispatcher.addListener(alwaysThrowsExceptionListener, alwaysThrowsExceptionListener);
+
+    eventDispatcher.dispatchEvent(0);
+  }
+
+  @Test
+  public void testListenerAddedTwice() {
+    EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
+        new TestEventUtil();
+
+    EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
+        new EventDispatcherImpl<>(eventUtil);
+
+    Listener<Integer> listener = new TestListener(new ArrayList<ListenerWithEventEntry>());
+    eventDispatcher.addListener(listener, listener);
+
+    try {
+      eventDispatcher.addListener(listener, listener);
+      Assert.fail();
+    } catch (ListenerAlreadyRegisteredException e) {
+
     }
+  }
 
-    @Test
-    public void testListenerAddedTwice() {
-        EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
-                new TestEventUtil();
+  @Test
+  public void testOneThread() {
+    EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
+        new TestEventUtil();
 
-        EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
-                new EventDispatcherImpl<Integer, Integer, Listener<Integer>, Listener<Integer>>(eventUtil);
+    EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
+        new EventDispatcherImpl<>(eventUtil);
 
-        Listener<Integer> listener = new TestListener(new ArrayList<ListenerWithEventEntry>());
-        eventDispatcher.addListener(listener, listener);
+    final List<ListenerWithEventEntry> collectedEvents = new ArrayList<>();
 
-        try {
-            eventDispatcher.addListener(listener, listener);
-            Assert.fail();
-        } catch (ListenerAlreadyRegisteredException e) {
+    Listener<Integer> listener1 = new TestListener(collectedEvents);
 
-        }
-    }
+    eventDispatcher.dispatchEvent(1);
+    eventDispatcher.dispatchEvent(2);
+    eventDispatcher.dispatchEvent(3);
+    eventDispatcher.removeEvent(2);
 
-    @Test
-    public void testOneThread() {
-        EventUtil<Integer, Integer, Listener<Integer>> eventUtil =
-                new TestEventUtil();
+    eventDispatcher.addListener(listener1, listener1);
+    eventDispatcher.dispatchEvent(4);
 
-        EventDispatcher<Integer, Integer, Listener<Integer>, Listener<Integer>> eventDispatcher =
-                new EventDispatcherImpl<Integer, Integer, Listener<Integer>, Listener<Integer>>(eventUtil);
+    // Checking two replay events and one event that is passed after the listener is registered.
+    Assert.assertEquals(Integer.valueOf(-1), collectedEvents.get(0).getEvent());
+    Assert.assertEquals(Integer.valueOf(-3), collectedEvents.get(1).getEvent());
+    Assert.assertEquals(Integer.valueOf(4), collectedEvents.get(2).getEvent());
 
-        final List<ListenerWithEventEntry> collectedEvents = new ArrayList<ListenerWithEventEntry>();
+    // Testing the dispatchAndRemove functionality in two steps. First an event is dispatched than a
+    // new listener is
+    // registered. The new listener should not catch the removed event.
+    eventDispatcher.dispatchAndRemoveEvent(1);
+    Assert.assertEquals(Integer.valueOf(1), collectedEvents.get(3).getEvent());
 
-        Listener<Integer> listener1 = new TestListener(collectedEvents);
+    // Second step of checking dispatchAndRemove functionality.
+    TestListener listener2 = new TestListener(collectedEvents);
+    eventDispatcher.addListener(listener2, listener2);
 
-        eventDispatcher.dispatchEvent(1);
-        eventDispatcher.dispatchEvent(2);
-        eventDispatcher.dispatchEvent(3);
-        eventDispatcher.removeEvent(2);
+    Assert.assertEquals(Integer.valueOf(-3), collectedEvents.get(4).getEvent());
+    Assert.assertEquals(Integer.valueOf(-4), collectedEvents.get(5).getEvent());
 
-        eventDispatcher.addListener(listener1, listener1);
-        eventDispatcher.dispatchEvent(4);
+    // Testing if the event dispatcher works with two active listeners.
+    eventDispatcher.dispatchEvent(5);
 
-        // Checking two replay events and one event that is passed after the listener is registered.
-        Assert.assertEquals(Integer.valueOf(-1), collectedEvents.get(0).getEvent());
-        Assert.assertEquals(Integer.valueOf(-3), collectedEvents.get(1).getEvent());
-        Assert.assertEquals(Integer.valueOf(4), collectedEvents.get(2).getEvent());
+    ListenerWithEventEntry l1WithEvent = collectedEvents.get(6);
+    ListenerWithEventEntry l2WithEvent = collectedEvents.get(7);
 
-        // Testing the dispatchAndRemove functionality in two steps. First an event is dispatched than a new listener is
-        // registered. The new listener should not catch the removed event.
-        eventDispatcher.dispatchAndRemoveEvent(1);
-        Assert.assertEquals(Integer.valueOf(1), collectedEvents.get(3).getEvent());
+    Assert.assertEquals(listener1, l1WithEvent.getListener());
+    Assert.assertEquals(Integer.valueOf(5), l1WithEvent.getEvent());
 
-        // Second step of checking dispatchAndRemove functionality.
-        TestListener listener2 = new TestListener(collectedEvents);
-        eventDispatcher.addListener(listener2, listener2);
+    Assert.assertEquals(listener2, l2WithEvent.getListener());
+    Assert.assertEquals(Integer.valueOf(5), l2WithEvent.getEvent());
 
-        Assert.assertEquals(Integer.valueOf(-3), collectedEvents.get(4).getEvent());
-        Assert.assertEquals(Integer.valueOf(-4), collectedEvents.get(5).getEvent());
+    collectedEvents.clear();
 
-        // Testing if the event dispatcher works with two active listeners.
-        eventDispatcher.dispatchEvent(5);
+    eventDispatcher.dispatchEvent(1);
 
-        ListenerWithEventEntry l1WithEvent = collectedEvents.get(6);
-        ListenerWithEventEntry l2WithEvent = collectedEvents.get(7);
+    l1WithEvent = collectedEvents.get(0);
+    l2WithEvent = collectedEvents.get(1);
 
-        Assert.assertEquals(listener1, l1WithEvent.getListener());
-        Assert.assertEquals(Integer.valueOf(5), l1WithEvent.getEvent());
+    Assert.assertEquals(listener1, l1WithEvent.getListener());
+    Assert.assertEquals(Integer.valueOf(1), l1WithEvent.getEvent());
 
-        Assert.assertEquals(listener2, l2WithEvent.getListener());
-        Assert.assertEquals(Integer.valueOf(5), l2WithEvent.getEvent());
+    Assert.assertEquals(listener2, l2WithEvent.getListener());
+    Assert.assertEquals(Integer.valueOf(1), l2WithEvent.getEvent());
 
-        collectedEvents.clear();
+    // Testing the removal of a listener. It should not fill collectedEvents anymore.
+    collectedEvents.clear();
+    eventDispatcher.removeListener(listener1);
 
-        eventDispatcher.dispatchEvent(1);
+    eventDispatcher.dispatchEvent(8);
+    Assert.assertEquals(1, collectedEvents.size());
+    Assert.assertEquals(8, collectedEvents.get(0).getEvent().intValue());
 
-        l1WithEvent = collectedEvents.get(0);
-        l2WithEvent = collectedEvents.get(1);
+    // Testing the removeEvent functionality. First it should return true as the event is removed
+    // second call must
+    // be false as the event is not even in the queue.
+    Assert.assertEquals(true, eventDispatcher.removeEvent(8));
+    Assert.assertEquals(false, eventDispatcher.removeEvent(8));
 
-        Assert.assertEquals(listener1, l1WithEvent.getListener());
-        Assert.assertEquals(Integer.valueOf(1), l1WithEvent.getEvent());
+    // Cleaning a bit to be able to test.
+    collectedEvents.clear();
+    eventDispatcher.removeEvent(3);
+    eventDispatcher.removeEvent(1);
+    eventDispatcher.removeEvent(4);
 
-        Assert.assertEquals(listener2, l2WithEvent.getListener());
-        Assert.assertEquals(Integer.valueOf(1), l2WithEvent.getEvent());
-
-        // Testing the removal of a listener. It should not fill collectedEvents anymore.
-        collectedEvents.clear();
-        eventDispatcher.removeListener(listener1);
-
-        eventDispatcher.dispatchEvent(8);
-        Assert.assertEquals(1, collectedEvents.size());
-        Assert.assertEquals(8, collectedEvents.get(0).getEvent().intValue());
-
-        // Testing the removeEvent functionality. First it should return true as the event is removed second call must
-        // be false as the event is not even in the queue.
-        Assert.assertEquals(true, eventDispatcher.removeEvent(8));
-        Assert.assertEquals(false, eventDispatcher.removeEvent(8));
-
-        // Cleaning a bit to be able to test.
-        collectedEvents.clear();
-        eventDispatcher.removeEvent(3);
-        eventDispatcher.removeEvent(1);
-        eventDispatcher.removeEvent(4);
-
-        // Removing a listener returns true
-        Assert.assertTrue(eventDispatcher.removeListener(listener2));
-        // Removing a listener when it is not registered returns false
-        Assert.assertFalse(eventDispatcher.removeListener(listener2));
-    }
+    // Removing a listener returns true
+    Assert.assertTrue(eventDispatcher.removeListener(listener2));
+    // Removing a listener when it is not registered returns false
+    Assert.assertFalse(eventDispatcher.removeListener(listener2));
+  }
 }

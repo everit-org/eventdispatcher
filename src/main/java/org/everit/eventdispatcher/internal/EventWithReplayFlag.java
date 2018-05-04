@@ -1,57 +1,57 @@
-/**
- * This file is part of Everit - Event dispatcher.
+/*
+ * Copyright (C) 2011 Everit Kft. (http://www.everit.org)
  *
- * Everit - Event dispatcher is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Everit - Event dispatcher is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ *         http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Everit - Event dispatcher.  If not, see <http://www.gnu.org/licenses/>.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.everit.eventdispatcher.internal;
 
 /**
- * Internal class that holds an event object and the flag that shows if the event is already converted to replay format.
+ * Internal class that holds an event object and the flag that shows if the event is already
+ * converted to replay format.
  *
  * @param <E>
- *            The type of the event.
+ *          The type of the event.
  */
 public class EventWithReplayFlag<E> {
 
-    /**
-     * The original event object or the replay format.
-     */
-    private E event;
+  /**
+   * The original event object or the replay format.
+   */
+  private E event;
 
-    /**
-     * A flag that shows if the event is converted to replay format.
-     */
-    private boolean replay = false;
+  /**
+   * A flag that shows if the event is converted to replay format.
+   */
+  private boolean replay = false;
 
-    public EventWithReplayFlag(final E event) {
-        this.event = event;
-    }
+  public EventWithReplayFlag(final E event) {
+    this.event = event;
+  }
 
-    public E getEvent() {
-        return event;
-    }
+  public E getEvent() {
+    return this.event;
+  }
 
-    public boolean isReplay() {
-        return replay;
-    }
+  public boolean isReplay() {
+    return this.replay;
+  }
 
-    public void setEvent(final E event) {
-        this.event = event;
-    }
+  public void setEvent(final E event) {
+    this.event = event;
+  }
 
-    public void setReplay(final boolean replay) {
-        this.replay = replay;
-    }
+  public void setReplay(final boolean replay) {
+    this.replay = replay;
+  }
 
 }

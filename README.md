@@ -24,5 +24,3 @@ registration.
 When the four types are defined the programmer can instantiate
 EventDispatcherImpl. See the JavaDoc of that class about constructor
 parameters.
-
-[![Analytics](https://ga-beacon.appspot.com/UA-15041869-4/everit-org/eventdispatcher)](https://github.com/igrigorik/ga-beacon)
