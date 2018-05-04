@@ -43,9 +43,10 @@ public interface EventUtil<E, EK, L> {
 
   /**
    * Creating a new replay event based on the original event. Please note that event implementations
-   * should always be immutable classes. If the implementing technology does not support event
-   * replays the result will be the same object as the incoming parameter. In case the function
-   * returns null an Exception will be thrown by the caller.
+   * should always be immutable classes. If the implementing technology does not make a difference
+   * between replayed and currently happening events, the result should be the same object as the
+   * incoming parameter. In case the function returns null an Exception will be thrown by the
+   * caller.
    *
    * @param originalEvent
    *          The event that was originally dispatched.
